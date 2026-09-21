@@ -5,23 +5,31 @@ import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import {
+  LayoutDashboard,
+  Users,
   Wrench,
   CreditCard,
   FileText,
-  Plus,
-  CheckCircle,
-  ShoppingCart,
-  LayoutDashboard,
-  Users,
   Settings,
+  Package,
+  Receipt,
+  BarChart3,
+  ShoppingCart,
+  Activity,
+  Plus,
 } from "lucide-react";
 
 const ownerNav = [
   { name: "Dashboard", href: "/manager", icon: LayoutDashboard },
   { name: "Customers", href: "/manager/customers", icon: Users },
   { name: "Jobs", href: "/manager/jobs", icon: Wrench },
+  { name: "POS", href: "/pos", icon: ShoppingCart },
+  { name: "Inventory", href: "/manager/inventory", icon: Package },
   { name: "Payments", href: "/manager/payments", icon: CreditCard },
-  { name: "Reports", href: "/manager/reports", icon: FileText },
+  { name: "Expenses", href: "/manager/expenses", icon: Receipt },
+  { name: "Reports", href: "/manager/reports", icon: BarChart3 },
+  { name: "Sales History", href: "/sales-history", icon: FileText },
+  { name: "Activity Log", href: "/manager/activity", icon: Activity },
   { name: "Settings", href: "/manager/settings", icon: Settings },
 ];
 
@@ -57,7 +65,7 @@ export function Sidebar() {
         </p>
       </div>
 
-      <nav className="flex-1 space-y-1">
+      <nav className="flex-1 space-y-1 overflow-y-auto">
         {navigation.map((item) => {
           const isActive = pathname === item.href;
           return (

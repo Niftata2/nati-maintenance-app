@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Banknote, CreditCard, Smartphone, Check, X, Package } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Banknote, CreditCard, Smartphone, Check, X, Package, Printer } from "lucide-react";
 
 export default function PendingPaymentsPage() {
+  const router = useRouter();
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState<any>(null);
@@ -12,6 +14,7 @@ export default function PendingPaymentsPage() {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [lastReceiptId, setLastReceiptId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPendingJobs();
@@ -36,6 +39,7 @@ export default function PendingPaymentsPage() {
     setPaidAmount(String(job.total));
     setPaymentMethod("CASH");
     setError("");
+    setLastReceiptId(null);
   };
 
   const handleCollect = async () => {
@@ -48,8 +52,11 @@ export default function PendingPaymentsPage() {
     setProcessing(true);
     setError("");
 
+    const jobId = selectedJob.id;
+    const customerName = selectedJob.customer.name;
+
     try {
-      const res = await fetch("/api/jobs/" + selectedJob.id + "/pay", {
+      const res = await fetch("/api/jobs/" + jobId + "/pay", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount, method: paymentMethod }),
@@ -60,15 +67,20 @@ export default function PendingPaymentsPage() {
         throw new Error(data.error || "Failed to record payment");
       }
 
-      setSuccess(amount.toLocaleString() + " ETB collected from " + selectedJob.customer.name);
+      setSuccess(amount.toLocaleString() + " ETB collected from " + customerName);
       setSelectedJob(null);
+      setLastReceiptId(jobId);
       await fetchPendingJobs();
-      setTimeout(() => setSuccess(""), 4000);
+      setTimeout(() => setSuccess(""), 6000);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setProcessing(false);
     }
+  };
+
+  const handlePrintReceipt = (jobId: string) => {
+    router.push("/receipts/job/" + jobId);
   };
 
   const methodLabel = (m: string) =>
@@ -85,9 +97,20 @@ export default function PendingPaymentsPage() {
         </div>
 
         {success && (
-          <div className="mb-4 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-md text-sm text-emerald-500 flex items-center gap-2">
-            <Check className="h-4 w-4" />
-            {success}
+          <div className="mb-4 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-md text-sm text-emerald-500 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Check className="h-4 w-4" />
+              {success}
+            </div>
+            {lastReceiptId && (
+              <button
+                onClick={() => handlePrintReceipt(lastReceiptId)}
+                className="px-3 py-1.5 bg-emerald-500 text-white text-xs font-medium rounded-md hover:bg-emerald-600 flex items-center gap-1.5"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Print Receipt
+              </button>
+            )}
           </div>
         )}
 

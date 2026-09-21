@@ -1,12 +1,34 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
-  const expenses = await prisma.expense.findMany({
-    orderBy: {
-      date: "desc",
-    },
-  });
+  try {
+    const expenses = await prisma.expense.findMany({
+      include: {
+        employee: { select: { name: true } },
+      },
+      orderBy: { date: "desc" },
+    });
+    return NextResponse.json(expenses);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || "Failed" }, { status: 500 });
+  }
+}
 
-  return NextResponse.json(expenses);
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const expense = await prisma.expense.create({
+      data: {
+        name: body.name,
+        category: body.category || "Other",
+        amount: body.amount,
+        description: body.description || null,
+        date: new Date(),
+      },
+    });
+    return NextResponse.json(expense);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || "Failed" }, { status: 500 });
+  }
 }
