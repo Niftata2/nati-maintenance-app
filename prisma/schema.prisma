@@ -1,0 +1,404 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  CASHIER
+  TECHNICIAN
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  MOBILE_MONEY
+  CREDIT
+  OTHER
+}
+
+enum JobStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_FOR_PARTS
+  READY_FOR_PICKUP
+  COMPLETED
+  NOT_REPAIRABLE
+  DELIVERED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum MovementType {
+  SALE
+  REPAIR_USAGE
+  PURCHASE
+  ADJUSTMENT
+  RETURN
+  INITIAL_STOCK
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String
+  role          Role      @default(TECHNICIAN)
+  phone         String?
+  address       String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sales          Sale[]
+  technicianJobs Job[]             @relation("JobTechnician")
+  createdJobs    Job[]             @relation("JobCreatedBy")
+  payments       Payment[]         @relation("PaymentReceivedBy")
+  expenses       Expense[]         @relation("ExpenseEmployee")
+  notifications  Notification[]
+  activities     ActivityLog[]
+  movements      InventoryMovement[] @relation("MovementUser")
+  sessions       Session[]
+  accounts       Account[]
+}
+
+model Customer {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String?
+  email       String?
+  address     String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sales    Sale[]
+  jobs     Job[]
+  payments Payment[]
+
+  @@index([name])
+  @@index([phone])
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products Product[]
+}
+
+model Supplier {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String?
+  email       String?
+  address     String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products  Product[]
+  movements InventoryMovement[]
+
+  @@index([name])
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  name          String
+  sku           String   @unique
+  barcode       String?
+  categoryId    String?
+  supplierId    String?
+  purchasePrice Decimal  @default(0) @db.Decimal(10, 2)
+  sellingPrice  Decimal  @default(0) @db.Decimal(10, 2)
+  currentStock  Int      @default(0)
+  minimumStock  Int      @default(0)
+  unit          String   @default("pcs")
+  image         String?
+  description   String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  category  Category?          @relation(fields: [categoryId], references: [id])
+  supplier  Supplier?          @relation(fields: [supplierId], references: [id])
+  saleItems SaleItem[]
+  jobItems  JobItem[]
+  movements InventoryMovement[]
+
+  @@index([name])
+  @@index([sku])
+  @@index([barcode])
+}
+
+model InventoryMovement {
+  id          String       @id @default(cuid())
+  productId   String
+  type        MovementType
+  quantity    Int
+  referenceId String?
+  notes       String?
+  createdAt   DateTime     @default(now())
+  createdBy   String
+  supplierId  String?
+
+  product  Product   @relation(fields: [productId], references: [id])
+  user     User      @relation("MovementUser", fields: [createdBy], references: [id])
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
+
+  @@index([productId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model Sale {
+  id              String        @id @default(cuid())
+  invoiceNumber   String        @unique
+  customerId      String?
+  cashierId       String
+  status          PaymentStatus @default(UNPAID)
+  subtotal        Decimal       @default(0) @db.Decimal(10, 2)
+  discount        Decimal       @default(0) @db.Decimal(10, 2)
+  tax             Decimal       @default(0) @db.Decimal(10, 2)
+  total           Decimal       @default(0) @db.Decimal(10, 2)
+  paidAmount      Decimal       @default(0) @db.Decimal(10, 2)
+  remainingAmount Decimal       @default(0) @db.Decimal(10, 2)
+  paymentMethod   PaymentMethod?
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  customer Customer?    @relation(fields: [customerId], references: [id])
+  cashier  User         @relation(fields: [cashierId], references: [id])
+  items    SaleItem[]
+  payments Payment[]
+
+  @@index([invoiceNumber])
+  @@index([customerId])
+  @@index([cashierId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SaleItem {
+  id        String  @id @default(cuid())
+  saleId    String
+  productId String
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  discount  Decimal @default(0) @db.Decimal(10, 2)
+  total     Decimal @db.Decimal(10, 2)
+
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+model Job {
+  id               String        @id @default(cuid())
+  jobNumber        String        @unique
+  customerId       String
+  technicianId     String?
+  createdById      String
+  deviceType       String
+  deviceModel      String?
+  serialNumber     String?
+  problem          String
+  diagnosis        String?
+  priority         Priority      @default(MEDIUM)
+  status           JobStatus     @default(PENDING)
+  laborCharge      Decimal       @default(0) @db.Decimal(10, 2)
+  partsCharge      Decimal       @default(0) @db.Decimal(10, 2)
+  additionalCharge Decimal       @default(0) @db.Decimal(10, 2)
+  discount         Decimal       @default(0) @db.Decimal(10, 2)
+  total            Decimal       @default(0) @db.Decimal(10, 2)
+  paidAmount       Decimal       @default(0) @db.Decimal(10, 2)
+  remainingAmount  Decimal       @default(0) @db.Decimal(10, 2)
+  paymentStatus    PaymentStatus @default(UNPAID)
+  paymentMethod    PaymentMethod?
+  notes            String?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  customer  Customer  @relation(fields: [customerId], references: [id])
+  technician User?    @relation("JobTechnician", fields: [technicianId], references: [id])
+  createdBy User      @relation("JobCreatedBy", fields: [createdById], references: [id])
+  items     JobItem[]
+  payments  Payment[]
+
+  @@index([jobNumber])
+  @@index([customerId])
+  @@index([technicianId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model JobItem {
+  id          String  @id @default(cuid())
+  jobId       String
+  productId   String?
+  name        String
+  quantity    Int
+  unitCost    Decimal @db.Decimal(10, 2)
+  total       Decimal @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+
+  job     Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id])
+
+  @@index([jobId])
+  @@index([productId])
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  paymentNumber String        @unique
+  customerId    String?
+  saleId        String?
+  jobId         String?
+  receivedById  String
+  amount        Decimal       @db.Decimal(10, 2)
+  method        PaymentMethod
+  reference     String?
+  notes         String?
+  createdAt     DateTime      @default(now())
+
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  sale       Sale?     @relation(fields: [saleId], references: [id])
+  job        Job?      @relation(fields: [jobId], references: [id])
+  receivedBy User      @relation("PaymentReceivedBy", fields: [receivedById], references: [id])
+
+  @@index([paymentNumber])
+  @@index([customerId])
+  @@index([saleId])
+  @@index([jobId])
+  @@index([createdAt])
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  name        String
+  category    String
+  amount      Decimal  @db.Decimal(10, 2)
+  employeeId  String?
+  date        DateTime @default(now())
+  description String?
+  receiptUrl  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employee User? @relation("ExpenseEmployee", fields: [employeeId], references: [id])
+
+  @@index([category])
+  @@index([date])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  module    String
+  recordId  String?
+  details   Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([module])
+  @@index([createdAt])
+}
+
+model SyncQueue {
+  id          String   @id @default(cuid())
+  entityType  String
+  entityId    String
+  action      String
+  data        Json
+  status      String   @default("pending")
+  retryCount  Int      @default(0)
+  lastError   String?
+  createdAt   DateTime @default(now())
+  syncedAt    DateTime?
+
+  @@index([status])
+  @@index([entityType])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
