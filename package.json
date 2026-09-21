@@ -2,6 +2,9 @@
   "name": "nati-maintenance-system",
   "version": "0.1.0",
   "private": true,
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build",
@@ -48,6 +51,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
+    "tsx": "^4.19.2",
     "typescript": "^6.0.3"
   }
 }
