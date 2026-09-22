@@ -15,6 +15,7 @@ export default function MyJobsPage() {
   const [newMaterial, setNewMaterial] = useState({ name: "", quantity: "1", unitCost: "" });
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState("");
+  const [filter, setFilter] = useState("ACTIVE");
 
   useEffect(() => {
     fetchMyJobs();
@@ -143,63 +144,107 @@ export default function MyJobsPage() {
     return styles[status] || { dot: "bg-zinc-400", label: status, bg: "bg-zinc-500/10", text: "text-zinc-400" };
   };
 
-  const paymentStyle = (status: string) => {
-    if (status === "PAID") return "bg-emerald-500/10 text-emerald-500";
-    if (status === "PARTIALLY_PAID") return "bg-amber-500/10 text-amber-500";
-    return "bg-red-500/10 text-red-500";
+  const filtered = jobs.filter((j) => {
+    if (filter === "ACTIVE")
+      return ["ASSIGNED", "IN_PROGRESS", "WAITING_FOR_PARTS"].includes(j.status);
+    if (filter === "WAITING_PAYMENT") return j.status === "READY_FOR_PICKUP";
+    if (filter === "DONE")
+      return ["COMPLETED", "DELIVERED"].includes(j.status);
+    if (filter === "FAILED")
+      return ["NOT_REPAIRABLE", "CANCELLED"].includes(j.status);
+    return true;
+  });
+
+  const counts = {
+    ACTIVE: jobs.filter((j) =>
+      ["ASSIGNED", "IN_PROGRESS", "WAITING_FOR_PARTS"].includes(j.status)
+    ).length,
+    WAITING_PAYMENT: jobs.filter((j) => j.status === "READY_FOR_PICKUP").length,
+    DONE: jobs.filter((j) => ["COMPLETED", "DELIVERED"].includes(j.status)).length,
+    FAILED: jobs.filter((j) => ["NOT_REPAIRABLE", "CANCELLED"].includes(j.status)).length,
+    ALL: jobs.length,
   };
 
   return (
-    <div className="flex gap-6">
-      <div className="flex-1 min-w-0">
+    <div className="w-full">
+      {/* Job List */}
+      <div className={selectedJob ? "hidden lg:block" : "block"}>
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground">My Jobs</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Jobs assigned to you — click to edit
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">My Jobs</h1>
+          <p className="text-xs md:text-sm text-muted-foreground mt-1">
+            Jobs assigned to you — tap to edit
           </p>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="bg-card border border-border rounded-lg mb-4 p-1 flex gap-1 overflow-x-auto">
+          {[
+            { key: "ACTIVE", label: "Active" },
+            { key: "WAITING_PAYMENT", label: "Ready" },
+            { key: "DONE", label: "Done" },
+            { key: "FAILED", label: "Failed" },
+            { key: "ALL", label: "All" },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setFilter(tab.key)}
+              className={
+                "px-3 py-2 text-xs md:text-sm font-medium rounded-md whitespace-nowrap transition-colors " +
+                (filter === tab.key
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent")
+              }
+            >
+              {tab.label}
+              <span className="ml-1.5 text-xs opacity-60">
+                {counts[tab.key as keyof typeof counts]}
+              </span>
+            </button>
+          ))}
         </div>
 
         {loading ? (
           <div className="text-center py-12 text-muted-foreground text-sm">Loading...</div>
-        ) : jobs.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="bg-card border border-border rounded-lg text-center py-16">
             <Package className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-            <p className="text-sm text-muted-foreground">No jobs assigned to you</p>
+            <p className="text-sm text-muted-foreground">No jobs in this category</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {jobs.map((job) => {
+            {filtered.map((job) => {
               const s = statusStyle(job.status);
               return (
                 <div
                   key={job.id}
                   onClick={() => openJob(job)}
-                  className={
-                    "bg-card border rounded-lg p-5 cursor-pointer transition-colors " +
-                    (selectedJob?.id === job.id ? "border-primary" : "border-border hover:border-primary/40")
-                  }
+                  className="bg-card border border-border rounded-lg p-4 cursor-pointer hover:border-primary/40 transition-colors"
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <div className="flex items-center gap-3 mb-1">
-                        <span className="text-sm font-semibold text-foreground">{job.jobNumber}</span>
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="text-sm font-semibold text-foreground">
+                          {job.jobNumber}
+                        </span>
                         <span className={"flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full " + s.bg + " " + s.text}>
                           <span className={"w-1.5 h-1.5 rounded-full " + s.dot}></span>
                           {s.label}
                         </span>
                       </div>
-                      <p className="text-sm text-muted-foreground">{job.customer.name}</p>
+                      <p className="text-sm font-medium text-foreground">{job.customer.name}</p>
                       <p className="text-xs text-muted-foreground">{job.customer.phone}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs text-muted-foreground mb-1">Total</p>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs text-muted-foreground">Total</p>
                       <p className="text-base font-bold text-foreground">
-                        {Number(job.total).toLocaleString()} ETB
+                        {Number(job.total).toLocaleString()}
                       </p>
+                      <p className="text-xs text-muted-foreground">ETB</p>
                     </div>
                   </div>
                   <p className="text-sm text-foreground">
-                    <span className="text-muted-foreground">Device:</span> {job.deviceType} {job.deviceModel || ""}
+                    <span className="text-muted-foreground">Device:</span>{" "}
+                    {job.deviceType} {job.deviceModel || ""}
                   </p>
                   <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{job.problem}</p>
                 </div>
@@ -209,32 +254,42 @@ export default function MyJobsPage() {
         )}
       </div>
 
+      {/* Job Editor Panel */}
       {selectedJob && (
-        <div className="w-[440px] bg-card border-l border-border fixed right-0 top-0 h-screen overflow-y-auto z-20 shadow-xl">
-          <div className="px-5 py-4 border-b border-border flex items-start justify-between sticky top-0 bg-card z-10">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-1">{selectedJob.jobNumber}</p>
-              <h2 className="text-base font-bold text-foreground">
+        <div className="bg-card border-border lg:fixed lg:right-0 lg:top-0 lg:h-screen lg:w-[440px] lg:border-l lg:overflow-y-auto lg:z-20 lg:shadow-xl">
+          <div className="px-4 md:px-5 py-3 md:py-4 border-b border-border flex items-start justify-between sticky top-0 bg-card z-10">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-muted-foreground mb-0.5">{selectedJob.jobNumber}</p>
+              <h2 className="text-sm md:text-base font-bold text-foreground truncate">
                 {selectedJob.deviceType} {selectedJob.deviceModel || ""}
               </h2>
             </div>
-            <button onClick={() => setSelectedJob(null)} className="text-muted-foreground hover:text-foreground p-1">
+            <button
+              onClick={() => setSelectedJob(null)}
+              className="text-muted-foreground hover:text-foreground p-1 shrink-0"
+            >
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          <div className="px-5 py-4 border-b border-border">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Customer</h3>
+          <div className="px-4 md:px-5 py-3 md:py-4 border-b border-border">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              Customer
+            </h3>
             <p className="text-sm font-medium text-foreground">{selectedJob.customer.name}</p>
             <p className="text-xs text-muted-foreground">{selectedJob.customer.phone}</p>
           </div>
 
-          <div className="px-5 py-4 border-b border-border">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Reported Problem</h3>
-            <p className="text-sm text-foreground leading-relaxed">{selectedJob.problem}</p>
+          <div className="px-4 md:px-5 py-3 md:py-4 border-b border-border">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              Reported Problem
+            </h3>
+            <p className="text-sm text-foreground leading-relaxed break-words">
+              {selectedJob.problem}
+            </p>
           </div>
 
-          <div className="px-5 py-4 border-b border-border">
+          <div className="px-4 md:px-5 py-3 md:py-4 border-b border-border">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
               Diagnosis / Notes
             </h3>
@@ -247,7 +302,7 @@ export default function MyJobsPage() {
             />
           </div>
 
-          <div className="px-5 py-4 border-b border-border">
+          <div className="px-4 md:px-5 py-3 md:py-4 border-b border-border">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
               Materials Used
             </h3>
@@ -255,18 +310,24 @@ export default function MyJobsPage() {
             {materials.length > 0 && (
               <div className="space-y-2 mb-3">
                 {materials.map((m, idx) => (
-                  <div key={idx} className="flex items-center justify-between bg-background border border-border rounded-md px-3 py-2">
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between bg-background border border-border rounded-md px-3 py-2"
+                  >
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{m.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {m.quantity} × {Number(m.unitCost).toLocaleString()} ETB
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 ml-2">
+                    <div className="flex items-center gap-2 ml-2 shrink-0">
                       <span className="text-sm font-semibold text-foreground">
                         {Number(m.total).toLocaleString()}
                       </span>
-                      <button onClick={() => removeMaterial(idx)} className="text-muted-foreground hover:text-red-500 p-1">
+                      <button
+                        onClick={() => removeMaterial(idx)}
+                        className="text-muted-foreground hover:text-red-500 p-1"
+                      >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -312,7 +373,7 @@ export default function MyJobsPage() {
             </div>
           </div>
 
-          <div className="px-5 py-4 border-b border-border">
+          <div className="px-4 md:px-5 py-3 md:py-4 border-b border-border">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
               Labor Charge (ETB)
             </h3>
@@ -326,7 +387,7 @@ export default function MyJobsPage() {
             />
           </div>
 
-          <div className="px-5 py-4 border-b border-border">
+          <div className="px-4 md:px-5 py-3 md:py-4 border-b border-border">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
               Cost Summary
             </h3>
@@ -347,14 +408,14 @@ export default function MyJobsPage() {
           </div>
 
           {error && (
-            <div className="px-5 py-3">
+            <div className="px-4 md:px-5 py-3">
               <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-md text-sm text-red-500">
                 {error}
               </div>
             </div>
           )}
 
-          <div className="px-5 py-4 sticky bottom-0 bg-card border-t border-border space-y-2">
+          <div className="px-4 md:px-5 py-3 md:py-4 sticky bottom-0 bg-card border-t border-border space-y-2">
             {selectedJob.status === "ASSIGNED" && (
               <button
                 onClick={() => updateStatus(selectedJob.id, "IN_PROGRESS")}
@@ -381,7 +442,7 @@ export default function MyJobsPage() {
                   className="w-full py-2.5 bg-emerald-500 text-white text-sm font-medium rounded-md hover:bg-emerald-600 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <CheckCircle className="h-4 w-4" />
-                  Mark Work Done → Send to Cashier
+                  Mark Work Done
                 </button>
                 {selectedJob.status === "IN_PROGRESS" && (
                   <button

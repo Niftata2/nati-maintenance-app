@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -17,6 +18,7 @@ import {
   ShoppingCart,
   Activity,
   Plus,
+  LogOut,
 } from "lucide-react";
 
 const ownerNav = [
@@ -46,6 +48,7 @@ const technicianNav = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: session } = useSession();
   const role = session?.user?.role;
 
@@ -53,6 +56,12 @@ export function Sidebar() {
     role === "OWNER" ? ownerNav :
     role === "CASHIER" ? cashierNav :
     technicianNav;
+
+  const handleSignOut = async () => {
+    await signOut({ redirect: false });
+    router.push("/login");
+    router.refresh();
+  };
 
   return (
     <div className="flex h-full flex-col py-6 px-4">
@@ -73,7 +82,7 @@ export function Sidebar() {
               key={item.name}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-150 ease-out active:scale-95 cursor-pointer",
+                "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-150 ease-out active:scale-95",
                 isActive
                   ? "bg-emerald-500/10 text-emerald-500"
                   : "text-zinc-400 hover:bg-white/5 hover:text-white"
@@ -85,6 +94,16 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      <div className="mt-4 pt-4 border-t border-white/10">
+        <button
+          onClick={handleSignOut}
+          className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-zinc-400 hover:bg-red-500/10 hover:text-red-500 transition-all w-full"
+        >
+          <LogOut className="h-5 w-5" />
+          Sign Out
+        </button>
+      </div>
     </div>
   );
 }
