@@ -62,7 +62,7 @@ export default function POSPage() {
       fetch(`/api/products/search?q=${searchQuery}`)
         .then((res) => res.json())
         .then((data) => {
-          setProducts(data);
+          setProducts(Array.isArray(data) ? data : []);
           setLoading(false);
         })
         .catch(() => setLoading(false));
@@ -127,7 +127,6 @@ export default function POSPage() {
       return;
     }
     setProcessing(true);
-
     try {
       const response = await fetch("/api/sales", {
         method: "POST",
@@ -170,23 +169,16 @@ export default function POSPage() {
   };
 
   const handlePrintReceipt = () => {
-    if (lastSaleId) {
-      router.push(`/receipts/${lastSaleId}`);
-    }
-  };
-
-  const handleDismiss = () => {
-    setSuccess("");
-    setLastSaleId(null);
+    if (lastSaleId) router.push(`/receipts/${lastSaleId}`);
   };
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-8rem)]">
+    <div className="flex flex-col lg:flex-row lg:gap-6 lg:h-[calc(100vh-8rem)]">
       {/* Success toast */}
       {success && (
-        <div className="fixed top-4 right-4 bg-emerald-500 text-white px-5 py-3 rounded-lg shadow-xl z-50 flex items-center gap-3 max-w-md">
+        <div className="fixed top-4 left-4 right-4 md:left-auto md:right-4 md:max-w-md bg-emerald-500 text-white px-4 py-3 rounded-lg shadow-xl z-50 flex items-center gap-3">
           <Check className="h-5 w-5 shrink-0" />
-          <span className="text-sm font-medium flex-1">{success}</span>
+          <span className="text-sm font-medium flex-1 min-w-0 break-words">{success}</span>
           {lastSaleId && (
             <button
               onClick={handlePrintReceipt}
@@ -196,15 +188,23 @@ export default function POSPage() {
               Print
             </button>
           )}
-          <button onClick={handleDismiss} className="p-1 hover:bg-emerald-600 rounded">
+          <button
+            onClick={() => {
+              setSuccess("");
+              setLastSaleId(null);
+            }}
+            className="p-1 hover:bg-emerald-600 rounded shrink-0"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
       )}
 
-      {/* Left: Search + Products */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <h1 className="text-xl font-bold text-foreground mb-4">Point of Sale</h1>
+      {/* Left / Top: Search + Products */}
+      <div className="flex-1 flex flex-col min-w-0 mb-4 lg:mb-0">
+        <h1 className="text-lg md:text-xl font-bold text-foreground mb-3 md:mb-4">
+          Point of Sale
+        </h1>
 
         <div className="mb-3">
           <label className="block text-xs font-medium text-muted-foreground mb-1.5">
@@ -224,14 +224,13 @@ export default function POSPage() {
           </select>
         </div>
 
-        <div className="relative mb-4">
+        <div className="relative mb-3 md:mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <input
             type="text"
-            placeholder="Search products by name or SKU..."
+            placeholder="Search products..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            autoFocus
             className="w-full pl-10 pr-4 py-2.5 text-sm bg-card border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
@@ -266,8 +265,8 @@ export default function POSPage() {
           )}
 
           {!loading && searchQuery.length === 0 && (
-            <div className="text-center py-16 text-muted-foreground">
-              <Search className="h-12 w-12 mx-auto mb-3 opacity-20" />
+            <div className="text-center py-12 md:py-16 text-muted-foreground">
+              <Search className="h-10 w-10 md:h-12 md:w-12 mx-auto mb-3 opacity-20" />
               <p className="text-sm">Start typing to search products</p>
             </div>
           )}
@@ -280,26 +279,26 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* Right: Cart */}
-      <div className="w-96 bg-card border border-border rounded-lg flex flex-col">
-        <div className="px-5 py-4 border-b border-border">
+      {/* Right / Bottom: Cart */}
+      <div className="w-full lg:w-96 bg-card border border-border rounded-lg flex flex-col lg:max-h-[calc(100vh-8rem)]">
+        <div className="px-4 md:px-5 py-3 md:py-4 border-b border-border">
           <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <ShoppingCart className="h-4 w-4" />
             Cart ({cart.length} {cart.length === 1 ? "item" : "items"})
           </h2>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3">
+        <div className="flex-1 overflow-y-auto p-3 max-h-[40vh] lg:max-h-none">
           {cart.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <ShoppingCart className="h-10 w-10 mx-auto mb-2 opacity-20" />
+            <div className="text-center py-8 md:py-12 text-muted-foreground">
+              <ShoppingCart className="h-8 w-8 md:h-10 md:w-10 mx-auto mb-2 opacity-20" />
               <p className="text-sm">Cart is empty</p>
             </div>
           ) : (
             <div className="space-y-2">
               {cart.map((item) => (
                 <div key={item.id} className="border border-border rounded-md p-3 bg-background">
-                  <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-start justify-between mb-2 gap-2">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
                       <p className="text-xs text-muted-foreground">
@@ -308,7 +307,7 @@ export default function POSPage() {
                     </div>
                     <button
                       onClick={() => removeFromCart(item.id)}
-                      className="text-muted-foreground hover:text-red-500 p-0.5 ml-2"
+                      className="text-muted-foreground hover:text-red-500 p-0.5 shrink-0"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -341,10 +340,10 @@ export default function POSPage() {
           )}
         </div>
 
-        <div className="border-t border-border p-4">
-          <div className="flex justify-between mb-4">
+        <div className="border-t border-border p-3 md:p-4">
+          <div className="flex justify-between mb-3 md:mb-4">
             <span className="text-sm text-muted-foreground">Total</span>
-            <span className="text-xl font-bold text-foreground">
+            <span className="text-lg md:text-xl font-bold text-foreground">
               {total.toLocaleString()} ETB
             </span>
           </div>
@@ -360,9 +359,9 @@ export default function POSPage() {
 
       {/* Payment Modal */}
       {showPayment && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-border rounded-lg w-full max-w-md">
-            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="px-4 md:px-5 py-3 md:py-4 border-b border-border flex items-center justify-between">
               <h3 className="text-base font-bold text-foreground">Payment</h3>
               <button
                 onClick={() => setShowPayment(false)}
@@ -371,12 +370,12 @@ export default function POSPage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="p-5">
-              <div className="text-center mb-6 pb-5 border-b border-border">
+            <div className="p-4 md:p-5">
+              <div className="text-center mb-5 md:mb-6 pb-4 md:pb-5 border-b border-border">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
                   Total amount
                 </p>
-                <p className="text-3xl font-bold text-foreground">
+                <p className="text-2xl md:text-3xl font-bold text-foreground">
                   {total.toLocaleString()} ETB
                 </p>
               </div>
@@ -384,7 +383,7 @@ export default function POSPage() {
               <p className="text-xs font-medium text-muted-foreground mb-3">
                 Payment method
               </p>
-              <div className="grid grid-cols-3 gap-2 mb-6">
+              <div className="grid grid-cols-3 gap-2 mb-5 md:mb-6">
                 {[
                   { key: "CASH", label: "Cash", Icon: Banknote },
                   { key: "BANK_TRANSFER", label: "Bank", Icon: CreditCard },
@@ -419,7 +418,7 @@ export default function POSPage() {
                   className="flex-1 py-2.5 bg-emerald-500 text-white text-sm font-medium rounded-md hover:bg-emerald-600 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <Check className="h-4 w-4" />
-                  {processing ? "Processing..." : "Complete Sale"}
+                  {processing ? "..." : "Complete Sale"}
                 </button>
               </div>
             </div>
