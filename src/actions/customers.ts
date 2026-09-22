@@ -1,41 +1,104 @@
-"use server"
+"use server";
 
-import type { Customer, CustomerDetail } from "../../domain/types/customer"
+import { prisma } from "@/lib/prisma";
+import type { Customer, CustomerDetail } from "../../domain/types/customer";
 
-// TEMPORARY MOCK DATA — Backend will replace this with Prisma queries
-const MOCK_CUSTOMERS: Customer[] = [
-  { id: "c1", name: "Fikru Alemu", phone: "+251 911 234 567", totalJobs: 4, lastServiceDate: "2 days ago", lastServiceDevice: "iPhone 12" },
-  { id: "c2", name: "Bethelhem T.", phone: "+251 922 345 678", totalJobs: 1, lastServiceDate: "1 week ago", lastServiceDevice: "Dell Latitude" },
-  { id: "c3", name: "Kebede W.", phone: "+251 933 456 789", totalJobs: 7, lastServiceDate: "3 days ago", lastServiceDevice: "Samsung A14" },
-  { id: "c4", name: "Hanna M.", phone: "+251 944 567 890", totalJobs: 2, lastServiceDate: "1 month ago", lastServiceDevice: "HP Pavilion" },
-]
+function timeAgo(date: Date): string {
+  const diff = Date.now() - new Date(date).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hr${hrs > 1 ? "s" : ""} ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days} day${days > 1 ? "s" : ""} ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} month${months > 1 ? "s" : ""} ago`;
+  const years = Math.floor(months / 12);
+  return `${years} year${years > 1 ? "s" : ""} ago`;
+}
 
-const MOCK_CUSTOMER_DETAILS: Record<string, CustomerDetail> = {
-  "c1": {
-    id: "c1", name: "Fikru Alemu", phone: "+251 911 234 567", totalJobs: 4, lastServiceDate: "2 days ago", lastServiceDevice: "iPhone 12",
-    jobs: [
-      { id: "j1042", jobNumber: 1042, deviceName: "iPhone 12", reportedProblem: "Screen cracked, touch not responding", status: "IN_PROGRESS", createdAt: "2 days ago", totalCost: 4500, paymentStatus: "UNPAID" },
-      { id: "j1015", jobNumber: 1015, deviceName: "iPhone 12", reportedProblem: "Battery replacement", status: "DELIVERED", createdAt: "3 months ago", totalCost: 1200, paymentStatus: "PAID" },
-    ]
-  },
-  "c2": {
-    id: "c2", name: "Bethelhem T.", phone: "+251 922 345 678", totalJobs: 1, lastServiceDate: "1 week ago", lastServiceDevice: "Dell Latitude",
-    jobs: [
-      { id: "j1041", jobNumber: 1041, deviceName: "Dell Latitude", reportedProblem: "Won't turn on, possible motherboard issue", status: "WAITING", createdAt: "1 week ago", totalCost: 0, paymentStatus: "UNPAID" },
-    ]
-  }
+function mapJobStatus(status: string): string {
+  const map: Record<string, string> = {
+    PENDING: "NEW",
+    ASSIGNED: "ASSIGNED",
+    IN_PROGRESS: "IN_PROGRESS",
+    WAITING_FOR_PARTS: "WAITING",
+    READY_FOR_PICKUP: "READY_FOR_PICKUP",
+    COMPLETED: "COMPLETED",
+    DELIVERED: "DELIVERED",
+    NOT_REPAIRABLE: "CANCELLED",
+    CANCELLED: "CANCELLED",
+  };
+  return map[status] || "NEW";
 }
 
 export async function getCustomers(searchQuery?: string): Promise<Customer[]> {
-  // TODO: Backend will implement Prisma: db.customer.findMany({ where: { name: { contains: searchQuery } } })
-  if (!searchQuery) return MOCK_CUSTOMERS
-  return MOCK_CUSTOMERS.filter(c => 
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    c.phone.includes(searchQuery)
-  )
+  const where: any = {};
+  if (searchQuery) {
+    where.OR = [
+      { name: { contains: searchQuery, mode: "insensitive" } },
+      { phone: { contains: searchQuery } },
+    ];
+  }
+
+  const customers = await prisma.customer.findMany({
+    where,
+    include: {
+      jobs: {
+        select: { deviceType: true, deviceModel: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+      _count: { select: { jobs: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return customers.map((c) => {
+    const lastJob = c.jobs[0];
+    return {
+      id: c.id,
+      name: c.name,
+      phone: c.phone || "—",
+      totalJobs: c._count.jobs,
+      lastServiceDate: lastJob ? timeAgo(lastJob.createdAt) : "Never",
+      lastServiceDevice: lastJob
+        ? `${lastJob.deviceType} ${lastJob.deviceModel || ""}`.trim()
+        : "—",
+    };
+  });
 }
 
 export async function getCustomerDetail(id: string): Promise<CustomerDetail | null> {
-  // TODO: Backend will implement Prisma: db.customer.findUnique({ where: { id }, include: { jobs: true } })
-  return MOCK_CUSTOMER_DETAILS[id] || null
+  const customer = await prisma.customer.findUnique({
+    where: { id },
+    include: {
+      jobs: { orderBy: { createdAt: "desc" } },
+    },
+  });
+
+  if (!customer) return null;
+
+  const lastJob = customer.jobs[0];
+
+  return {
+    id: customer.id,
+    name: customer.name,
+    phone: customer.phone || "—",
+    totalJobs: customer.jobs.length,
+    lastServiceDate: lastJob ? timeAgo(lastJob.createdAt) : "Never",
+    lastServiceDevice: lastJob
+      ? `${lastJob.deviceType} ${lastJob.deviceModel || ""}`.trim()
+      : "—",
+    jobs: customer.jobs.map((j) => ({
+      id: j.id,
+      jobNumber: parseInt(j.jobNumber.replace(/^JOB-?/, "")) || 0,
+      deviceName: `${j.deviceType} ${j.deviceModel || ""}`.trim(),
+      reportedProblem: j.problem,
+      status: mapJobStatus(j.status) as any,
+      createdAt: timeAgo(j.createdAt),
+      totalCost: Number(j.total),
+      paymentStatus: j.paymentStatus as any,
+    })),
+  };
 }
